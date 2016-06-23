@@ -4,6 +4,7 @@ namespace Building\Domain\Aggregate;
 
 use Building\Domain\DomainEvent\NewBuildingWasRegistered;
 use Building\Domain\DomainEvent\UserCheckedIntoBuilding;
+use Building\Domain\DomainEvent\UserCheckedOutOfBuilding;
 use Prooph\EventSourcing\AggregateRoot;
 use Rhumsaa\Uuid\Uuid;
 
@@ -18,6 +19,11 @@ final class Building extends AggregateRoot
      * @var string
      */
     private $name;
+
+    /**
+     * @var string[]
+     */
+    private $checkedInUsers = [];
 
     public static function new($name) : self
     {
@@ -35,6 +41,14 @@ final class Building extends AggregateRoot
 
     public function checkInUser(string $username)
     {
+        /*
+        if(in_array($username, $this->checkedInUsers, true)) {
+            throw new \InvalidArgumentException(sprintf(
+                'User "%S" is already checked in',
+                $username
+            ));
+        }
+        */
         $this->recordThat(UserCheckedIntoBuilding::occur(
             $this->id(),
           [
@@ -45,7 +59,12 @@ final class Building extends AggregateRoot
 
     public function checkOutUser(string $username)
     {
-        // @TODO to be implemented
+        $this->recordThat(UserCheckedOutOfBuilding::occur(
+          $this->id(),
+          [
+              'name' => $username,
+          ]
+        ));
     }
 
     public function whenNewBuildingWasRegistered(NewBuildingWasRegistered $event)
@@ -56,7 +75,15 @@ final class Building extends AggregateRoot
 
     public function whenUserCheckedIntoBuilding(UserCheckedIntoBuilding $event)
     {
-        // @TODO 
+        $username = $event->username();
+
+        $this->checkedInUsers[] = $username;
+        $this->checkedInUsers = array_unique($this->checkedInUsers);
+    }
+
+    public function whenUserCheckedOutOfBuilding(UserCheckedOutOfBuilding $event)
+    {
+        //
     }
 
     /**

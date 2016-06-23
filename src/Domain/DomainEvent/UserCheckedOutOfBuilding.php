@@ -4,7 +4,7 @@ namespace Building\Domain\DomainEvent;
 
 use Prooph\EventSourcing\AggregateChanged;
 
-class UserCheckedIntoBuilding extends AggregateChanged
+class UserCheckedOutOfBuilding extends AggregateChanged
 {
   public function username() : string
   {

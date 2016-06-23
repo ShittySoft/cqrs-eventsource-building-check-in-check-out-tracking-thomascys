@@ -171,7 +171,7 @@ call_user_func(function () {
             Command\RegisterNewBuilding::class => function (ContainerInterface $container) : RegisterNewBuildingHandler {
                 return new RegisterNewBuildingHandler($container->get(BuildingRepositoryInterface::class));
             },
-            // Command ->
+            // Command -> Check user into Building
             Command\CheckUserIntoBuilding::class => function (ContainerInterface $container) : callable {
                 $repo = $container->get(BuildingRepositoryInterface::class);
                 
@@ -183,8 +183,21 @@ call_user_func(function () {
                 };
             },
 
+            // Command -> Check user out of Building
+            Command\CheckUserOutOfBuilding::class => function (ContainerInterface $container) : callable {
+                  $repo = $container->get(BuildingRepositoryInterface::class);
+    
+                  return function (Command\CheckUserOutOfBuilding $checkOut) use ($repo) {
+                      $building = $repo->get(Uuid::fromString($checkOut->buildingId()));
+                      $building->checkOutUser($checkOut->username());
 
-            BuildingRepositoryInterface::class => function (ContainerInterface $container) : BuildingRepositoryInterface {
+                      $repo->add($building);
+                  };
+          },
+
+
+
+          BuildingRepositoryInterface::class => function (ContainerInterface $container) : BuildingRepositoryInterface {
                 return new BuildingRepository(
                     new AggregateRepository(
                         $container->get(EventStore::class),
@@ -193,6 +206,24 @@ call_user_func(function () {
                     )
                 );
             },
+
+
+            DomainEvent\UserCheckedIntoBuilding::class . '-projectors' => function(ContainerInterface $container) {
+                return [
+                    function (DomainEvent\UserCheckedIntoBuilding $event) {
+                        $path = __DIR__ . '/' . $event->aggregateId() . '.json';
+
+                        if(file_exists($path)) {
+                            $existingUsers = json_decode(file_get_contents($path), true);
+                        }
+
+                        $existingUsers[] = $event->username();
+
+                        file_put_contents($path, json_encode(array_values($existingUsers)));
+                    }
+                ];
+            }
+
         ],
     ]);
 
@@ -234,7 +265,13 @@ call_user_func(function () {
     });
 
     $app->post('/checkout/{buildingId}', function (Request $request, Response $response) use ($sm) {
+        $commandBus = $sm->get(CommandBus::class);
+        $commandBus->dispatch(Command\CheckUserOutOfBuilding::fromUsernameAndBuildingId(
+          $request->getParsedBody()['username'],
+          $request->getAttribute('buildingId')
+        ));
 
+        return $response->withAddedHeader('Location', '/building/' . $request->getAttribute('buildingId'));
     });
 
     $app->run();
